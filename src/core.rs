@@ -36,6 +36,32 @@ pub fn rand<T: Default + Copy>() -> T {
     }
 }
 
+/// Generates a random number widthin a range using ```rand()```
+///
+/// # Examples
+/// ```
+/// let random_char = rand_range::<u8>(0, 100) as char;
+/// let random_u8: u8 = rand_range(0, 100);
+/// ```
+pub fn rand_range<
+    T: Default
+        + Copy
+        + std::ops::Sub
+        + std::ops::Add
+        + std::ops::Rem
+        + std::convert::From<<T as std::ops::Sub>::Output>
+        + std::convert::From<<T as std::ops::Add>::Output>
+        + std::convert::From<<T as std::ops::Rem>::Output>,
+>(
+    min: T,
+    max: T,
+) -> T {
+    let modulo: T = (max - min).into();
+    let result: T = (rand::<T>() % modulo).into();
+    let result: T = (result + min).into();
+    result
+}
+
 /// Controls functionality of the terminal.
 ///
 /// Most of the functions in this module are just abtractions over platform
