@@ -90,6 +90,7 @@ pub mod terminal {
             return Ok(Handle {});
         }
 
+        #[allow(unreachable_code)]
         Err("Platform not implemented")
     }
 
