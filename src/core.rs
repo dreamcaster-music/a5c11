@@ -22,5 +22,10 @@ pub fn terminal_size() -> Option<(u16, u16)> {
             return Some((size.ws_col, size.ws_row));
         }
     }
+
+    // Put windows code here
+    #[cfg(windows)]
+    {}
+
     None
 }
