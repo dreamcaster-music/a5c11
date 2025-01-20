@@ -4,15 +4,12 @@ use std::mem;
 use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
 
 #[cfg(windows)]
-use winapi::um::handleapi::INVALID_HANDLE_VALUE;
-#[cfg(windows)]
-use winapi::um::processenv::GetStdHandle;
-#[cfg(windows)]
-use winapi::um::winbase::STD_OUTPUT_HANDLE;
-#[cfg(windows)]
-use winapi::um::wincon::GetConsoleScreenBufferInfo;
-#[cfg(windows)]
-use winapi::um::wincon::CONSOLE_SCREEN_BUFFER_INFO;
+use winapi::um::{
+    handleapi::INVALID_HANDLE_VALUE,
+    processenv::GetStdHandle,
+    winbase::STD_OUTPUT_HANDLE,
+    wincon::{GetConsoleScreenBufferInfo, CONSOLE_SCREEN_BUFFER_INFO},
+};
 
 /// Returns the size of the terminal window.
 ///
@@ -24,37 +21,31 @@ use winapi::um::wincon::CONSOLE_SCREEN_BUFFER_INFO;
 /// ```
 /// let (width, height) = terminal_size().expect("Failed to get the size of the terminal window");
 /// ```
-pub fn terminal_size() -> Option<(u16, u16)> {
+pub fn terminal_size() -> Option<(usize, usize)> {
     // Use libc on Unix-like systems to obtain the width and height.
     #[cfg(unix)]
     {
         let mut size: winsize = unsafe { mem::zeroed() };
         if unsafe { ioctl(STDOUT_FILENO, TIOCGWINSZ, &mut size) } == 0 {
-            return Some((size.ws_col, size.ws_row));
+            return Some((size.ws_col as usize, size.ws_row as usize));
         }
     }
 
     // Put windows code here
     #[cfg(windows)]
     {
-        unsafe {
-            let handle = GetStdHandle(STD_OUTPUT_HANDLE);
-            if handle == INVALID_HANDLE_VALUE {
-                return None;
-            }
+        let handle = unsafe { GetStdHandle(STD_OUTPUT_HANDLE) };
+        if handle == INVALID_HANDLE_VALUE {
+            return None;
+        }
 
-            let mut csbi: CONSOLE_SCREEN_BUFFER_INFO = mem::zeroed();
-            if GetConsoleScreenBufferInfo(handle, &mut csbi) != 0 {
-                // Convert i16 to u16 using try_into()
-                return Some((
-                    (csbi.srWindow.Right - csbi.srWindow.Left + 1)
-                        .try_into()
-                        .unwrap(),
-                    (csbi.srWindow.Bottom - csbi.srWindow.Top + 1)
-                        .try_into()
-                        .unwrap(),
-                ));
-            }
+        let mut csbi: CONSOLE_SCREEN_BUFFER_INFO = unsafe { mem::zeroed() };
+        if unsafe { GetConsoleScreenBufferInfo(handle, &mut csbi) } != 0 {
+            // Convert i16 to u16 using try_into()
+            return Some((
+                (csbi.srWindow.Right - csbi.srWindow.Left + 1).min(0) as usize,
+                (csbi.srWindow.Bottom - csbi.srWindow.Top + 1).min(0) as usize,
+            ));
         }
     }
 
