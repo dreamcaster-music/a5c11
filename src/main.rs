@@ -1,6 +1,7 @@
 mod core;
 
 fn main() {
+    // initialize terminal
     let _ = core::terminal::init().unwrap();
 
     match core::terminal::size() {

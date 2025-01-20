@@ -85,8 +85,12 @@ pub mod terminal {
             });
         }
 
-        #[allow(unreachable_code)]
-        Err("Platform-specific code not found")
+        #[cfg(windows)]
+        {
+            return Ok(Handle {});
+        }
+
+        Err("Platform not implemented")
     }
 
     /// Returns the size of the terminal window.
@@ -100,7 +104,7 @@ pub mod terminal {
     /// let (width, height) = size().expect("Failed to get the size of the terminal window");
     /// ```
     pub fn size() -> Option<(usize, usize)> {
-        // Use libc on Unix-like systems to obtain the width and height.
+        // Use libc on Unix-like systems
         #[cfg(unix)]
         {
             let mut size: winsize = unsafe { mem::zeroed() };
@@ -109,7 +113,7 @@ pub mod terminal {
             }
         }
 
-        // Put windows code here
+        // Use winapi on Windows systems
         #[cfg(windows)]
         {
             unsafe {
@@ -120,7 +124,7 @@ pub mod terminal {
 
                 let mut csbi: CONSOLE_SCREEN_BUFFER_INFO = mem::zeroed();
                 if GetConsoleScreenBufferInfo(handle, &mut csbi) != 0 {
-                    // Convert i16 to u16 using try_into()
+                    // Convert i16 to usize
                     return Some((
                         (csbi.srWindow.Right - csbi.srWindow.Left + 1).min(0) as usize,
                         (csbi.srWindow.Bottom - csbi.srWindow.Top + 1).min(0) as usize,
