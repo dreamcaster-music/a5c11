@@ -1,3 +1,4 @@
+#[cfg(unix)]
 use std::io::Read;
 
 /// Generates a random number
@@ -71,7 +72,7 @@ pub mod terminal {
     pub const ESC: &'static str = "\x1b";
 
     #[cfg(windows)]
-    pub const ESC: &'static str = "\\e";
+    pub const ESC: &'static str = "\x1b";
 
     /// Represents an element on the screen.
     ///
@@ -221,16 +222,19 @@ pub mod terminal {
         #[cfg(windows)]
         {
             unsafe {
-                if GetStdHandle(STD_OUTPUT_HANDLE) != INVALID_HANDLE_VALUE {
-                    let mut csbi: CONSOLE_SCREEN_BUFFER_INFO = mem::zeroed();
-                    if GetConsoleScreenBufferInfo(handle, &mut csbi) != 0 {
-                        // Convert i16 to usize
-                        return Some((
-                            (csbi.srWindow.Right - csbi.srWindow.Left + 1).min(0) as usize,
-                            (csbi.srWindow.Bottom - csbi.srWindow.Top + 1).min(0) as usize,
-                        ));
-                    }
-                }
+                let handle = GetStdHandle(STD_OUTPUT_HANDLE);
+            if handle == INVALID_HANDLE_VALUE {
+                return None;
+            }
+
+            let mut csbi: CONSOLE_SCREEN_BUFFER_INFO = mem::zeroed();
+            if GetConsoleScreenBufferInfo(handle, &mut csbi) != 0 {
+                
+                return Some((
+                    (csbi.srWindow.Right - csbi.srWindow.Left + 1).max(0) as usize,
+                    (csbi.srWindow.Bottom - csbi.srWindow.Top + 1).max(0) as usize,
+                ));
+            }
             }
         }
 
