@@ -1,8 +1,83 @@
+use std::io::Read;
+
+/// Generates a random number
+///
+/// I have no idea if this is cryptographically secure so please don't use it
+/// for anything like that.
+///
+/// # Examples
+/// ```
+/// let random_char = rand::<char>();
+/// let random_u8: u8 = rand();
+/// ```
+pub fn rand<T: Default + Copy>() -> T {
+    #[cfg(unix)]
+    {
+        let mut buffer = vec![0u8; size_of::<T>()];
+        std::fs::File::open("/dev/urandom")
+            .expect("Failed to open /dev/urandom")
+            .read_exact(&mut buffer)
+            .expect("Failed to read random bytes");
+
+        let mut result: T = T::default();
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                buffer.as_ptr(),
+                &mut result as *mut T as *mut u8,
+                size_of::<T>(),
+            );
+        }
+        return result;
+    }
+
+    #[cfg(windows)]
+    {
+        todo!()
+    }
+}
+
 /// Controls functionality of the terminal.
 ///
 /// Most of the functions in this module are just abtractions over platform
 /// specific code.
 pub mod terminal {
+    #[cfg(unix)]
+    pub const ESC: &'static str = "\x1b";
+
+    #[cfg(windows)]
+    pub const ESC: &'static str = "\\e";
+
+    /// Represents an element on the screen.
+    ///
+    /// See https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797#256-colors
+    /// for what colors are able to be used.
+    pub struct Element {
+        character: char,
+        foreground_code: u8,
+        background_code: u8,
+    }
+
+    #[allow(dead_code)]
+    impl Element {
+        pub fn new(character: char, foreground_code: u8, background_code: u8) -> Self {
+            Self {
+                character,
+                foreground_code,
+                background_code,
+            }
+        }
+    }
+
+    impl ToString for Element {
+        fn to_string(&self) -> String {
+            format!(
+                "{ESC}[38;5;{foreground}m{ESC}[48;5;{background}m{character}",
+                foreground = self.foreground_code,
+                background = self.background_code,
+                character = self.character
+            )
+        }
+    }
     use std::{io::Write, mem};
 
     #[cfg(unix)]
@@ -44,7 +119,7 @@ pub mod terminal {
 
             // Clear screen and reset cursor
             let mut stdout = std::io::stdout();
-            write!(stdout, "\x1b[2J\x1B[H").unwrap();
+            write!(stdout, "{ESC}[2j{ESC}[h").unwrap();
             stdout.flush().unwrap();
         }
     }
@@ -56,6 +131,11 @@ pub mod terminal {
     /// The terminal handle _must_ be owned in order for the application
     /// to function correctly, so the ```Handle``` should not be dropped
     /// until the engine is exiting.
+    ///
+    /// # Example
+    /// ```
+    /// let _handle = init().expect("Failed to initialize terminal");
+    /// ```
     pub fn init() -> Result<Handle, &'static str> {
         #[cfg(unix)]
         {
@@ -89,9 +169,6 @@ pub mod terminal {
         {
             return Ok(Handle {});
         }
-
-        #[allow(unreachable_code)]
-        Err("Platform not implemented")
     }
 
     /// Returns the size of the terminal window.
@@ -118,22 +195,64 @@ pub mod terminal {
         #[cfg(windows)]
         {
             unsafe {
-                let handle = GetStdHandle(STD_OUTPUT_HANDLE);
-                if handle == INVALID_HANDLE_VALUE {
-                    return None;
-                }
-
-                let mut csbi: CONSOLE_SCREEN_BUFFER_INFO = mem::zeroed();
-                if GetConsoleScreenBufferInfo(handle, &mut csbi) != 0 {
-                    // Convert i16 to usize
-                    return Some((
-                        (csbi.srWindow.Right - csbi.srWindow.Left + 1).min(0) as usize,
-                        (csbi.srWindow.Bottom - csbi.srWindow.Top + 1).min(0) as usize,
-                    ));
+                if GetStdHandle(STD_OUTPUT_HANDLE) != INVALID_HANDLE_VALUE {
+                    let mut csbi: CONSOLE_SCREEN_BUFFER_INFO = mem::zeroed();
+                    if GetConsoleScreenBufferInfo(handle, &mut csbi) != 0 {
+                        // Convert i16 to usize
+                        return Some((
+                            (csbi.srWindow.Right - csbi.srWindow.Left + 1).min(0) as usize,
+                            (csbi.srWindow.Bottom - csbi.srWindow.Top + 1).min(0) as usize,
+                        ));
+                    }
                 }
             }
         }
 
         None
+    }
+
+    /// Displays an array of elements on the screen
+    ///
+    /// The array of elements is expected to be a flattened array arranged
+    /// from left to right, then top to bottom, like a book.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// display(&vec![]).unwrap();
+    /// ```
+    pub fn display(elements: &Vec<Element>) -> Result<(), &'static str> {
+        let stdout = std::io::stdout();
+        let mut handle = stdout.lock();
+
+        // Clear screen and move cursor to top left
+        write!(handle, "{ESC}[2j{ESC}[h").map_err(|_| "Failed to write to handle")?;
+
+        // Get terminal size
+        let (width, height) = size().ok_or("Failed to get display size")?;
+
+        // Write elements to screen
+        for y in 0..height {
+            for x in 0..width {
+                // Write the current element
+                write!(
+                    handle,
+                    "{}",
+                    elements
+                        .get(x + y * width)
+                        .ok_or("Index out of bounds")?
+                        .to_string()
+                )
+                .map_err(|_| "Failed to write to handle")?;
+            }
+
+            // Next line
+            writeln!(handle).map_err(|_| "Failed to write to handle")?;
+        }
+
+        // Flush handle
+        handle.flush().map_err(|_| "Failed to flush handle")?;
+
+        Ok(())
     }
 }
