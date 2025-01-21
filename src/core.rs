@@ -1,5 +1,45 @@
+#![allow(dead_code)]
+
 #[cfg(unix)]
 use std::io::Read;
+
+/// Generates a ```Vec``` of random numbers
+///
+/// # Examples
+/// ```
+/// let random_chars = rand::<char>(200);
+/// let random_u8s: Vec<u8> = rand(25);
+/// ```
+pub fn rand_vec<T: Default + Copy>(len: usize) -> Vec<T> {
+    #[cfg(unix)]
+    {
+        let mut buffer = vec![0u8; len * size_of::<T>()]; // Allocate buffer for N elements of T
+        std::fs::File::open("/dev/urandom")
+            .expect("Failed to open /dev/urandom")
+            .read_exact(&mut buffer)
+            .expect("Failed to read random bytes");
+
+        let mut result: Vec<T> = Vec::with_capacity(len);
+        unsafe {
+            for chunk in buffer.chunks_exact(size_of::<T>()) {
+                let mut element: T = T::default();
+                std::ptr::copy_nonoverlapping(
+                    chunk.as_ptr(),
+                    &mut element as *mut T as *mut u8,
+                    size_of::<T>(),
+                );
+                result.push(element);
+            }
+        }
+
+        result
+    }
+
+    #[cfg(windows)]
+    {
+        todo!()
+    }
+}
 
 /// Generates a random number
 ///
@@ -37,12 +77,50 @@ pub fn rand<T: Default + Copy>() -> T {
     }
 }
 
-/// Generates a random number widthin a range using ```rand()```
+/// Generates a ```Vec``` of random numbers within a range using ```rand()```
+///
+/// # Examples
+/// ```
+/// let random_chars = rand_vec_range::<u8>(0, 100, 200) as char;
+/// let random_u8s: Vec<u8> = rand_vec_range(0, 10, 25);
+/// ```
+pub fn rand_vec_range<
+    T: Default
+        + Copy
+        + std::ops::Sub
+        + std::ops::Add
+        + std::ops::Rem
+        + std::convert::From<<T as std::ops::Sub>::Output>
+        + std::convert::From<<T as std::ops::Add>::Output>
+        + std::convert::From<<T as std::ops::Rem>::Output>
+        + PartialEq
+        + PartialOrd,
+>(
+    min: T,
+    max: T,
+    len: usize,
+) -> Vec<T> {
+    if min == max {
+        return vec![min; len];
+    }
+
+    rand_vec::<T>(len)
+        .into_iter()
+        .map(|value| {
+            let modulo: T = (max - min).into();
+            let result: T = (value % modulo).into();
+            let result: T = (result + min).into();
+            result
+        })
+        .collect()
+}
+
+/// Generates a random number within a range using ```rand()```
 ///
 /// # Examples
 /// ```
 /// let random_char = rand_range::<u8>(0, 100) as char;
-/// let random_u8: u8 = rand_range(0, 100);
+/// let random_u8: u8 = rand_range(0, 10);
 /// ```
 pub fn rand_range<
     T: Default
@@ -52,15 +130,48 @@ pub fn rand_range<
         + std::ops::Rem
         + std::convert::From<<T as std::ops::Sub>::Output>
         + std::convert::From<<T as std::ops::Add>::Output>
-        + std::convert::From<<T as std::ops::Rem>::Output>,
+        + std::convert::From<<T as std::ops::Rem>::Output>
+        + PartialEq
+        + std::cmp::PartialOrd,
 >(
     min: T,
     max: T,
 ) -> T {
+    if min == max {
+        return min;
+    }
+
+    let value: T = rand();
     let modulo: T = (max - min).into();
-    let result: T = (rand::<T>() % modulo).into();
+    let result: T = (value % modulo).into();
     let result: T = (result + min).into();
     result
+}
+
+/// Shuffles a vector using ```rand()```
+///
+/// # Example
+/// ```
+/// let mut vec: Vec<_> = (0..5).collect();
+/// shuffle(&mut vec);
+/// ```
+pub fn shuffle<
+    T: Default
+        + Copy
+        + std::ops::Sub
+        + std::ops::Add
+        + std::ops::Rem
+        + std::convert::From<<T as std::ops::Sub>::Output>
+        + std::convert::From<<T as std::ops::Add>::Output>
+        + std::convert::From<<T as std::ops::Rem>::Output>
+        + PartialEq,
+>(
+    vec: &mut Vec<T>,
+) {
+    for i in 0..vec.len() {
+        let j = rand_range(0, vec.len() - 1);
+        vec.swap(i, j);
+    }
 }
 
 /// Controls functionality of the terminal.
@@ -68,10 +179,6 @@ pub fn rand_range<
 /// Most of the functions in this module are just abtractions over platform
 /// specific code.
 pub mod terminal {
-    #[cfg(unix)]
-    pub const ESC: &'static str = "\x1b";
-
-    #[cfg(windows)]
     pub const ESC: &'static str = "\x1b";
 
     /// Represents an element on the screen.
@@ -84,7 +191,6 @@ pub mod terminal {
         background_code: u8,
     }
 
-    #[allow(dead_code)]
     impl Element {
         pub fn new(character: char, foreground_code: u8, background_code: u8) -> Self {
             Self {
@@ -105,11 +211,29 @@ pub mod terminal {
             )
         }
     }
+
+    impl Element {
+        fn char(&self) -> char {
+            self.character
+        }
+
+        fn fg(&self) -> String {
+            format!("{ESC}[38;5;{}m", self.foreground_code)
+        }
+
+        fn bg(&self) -> String {
+            format!("{ESC}[48;5;{}m", self.background_code)
+        }
+    }
+
     use std::{io::Write, mem};
 
     #[cfg(unix)]
     use {
-        libc::{ioctl, tcgetattr, tcsetattr, winsize, ICANON, STDOUT_FILENO, TCSANOW, TIOCGWINSZ},
+        libc::{
+            ioctl, tcgetattr, tcsetattr, winsize, ECHO, ICANON, IXOFF, IXON, STDOUT_FILENO,
+            TCSANOW, TIOCGWINSZ, VMIN, VTIME,
+        },
         std::os::fd::AsRawFd,
     };
 
@@ -168,6 +292,7 @@ pub mod terminal {
         {
             // Create a new termios
             let file_descriptor = std::io::stdin().as_raw_fd();
+            println!("File descriptor: {}", file_descriptor);
             let mut termios = unsafe {
                 let mut termios = std::mem::zeroed();
                 if tcgetattr(file_descriptor, &mut termios) != 0 {
@@ -177,11 +302,20 @@ pub mod terminal {
             };
 
             // Save the previous termios so that we can restore it later
-            let original_termios = termios;
+            let original_termios = termios.clone();
 
             // Enable raw mode (disable canonical mode and echo)
-            termios.c_lflag &= !(ICANON | TCSANOW as u64);
 
+            // Disable canonical mode and echo
+            termios.c_lflag &= !(ICANON | ECHO);
+
+            // Disable flow control
+            termios.c_iflag &= !(IXON | IXOFF);
+
+            termios.c_cc[VMIN] = 1; // Minimum number of characters for non-blocking reads
+            termios.c_cc[VTIME] = 0; // Timeout for reads
+
+            // Apply the raw mode settings
             if unsafe { tcsetattr(file_descriptor, TCSANOW, &termios) } != 0 {
                 return Err("Failed to set terminal attributes");
             }
@@ -223,18 +357,17 @@ pub mod terminal {
         {
             unsafe {
                 let handle = GetStdHandle(STD_OUTPUT_HANDLE);
-            if handle == INVALID_HANDLE_VALUE {
-                return None;
-            }
+                if handle == INVALID_HANDLE_VALUE {
+                    return None;
+                }
 
-            let mut csbi: CONSOLE_SCREEN_BUFFER_INFO = mem::zeroed();
-            if GetConsoleScreenBufferInfo(handle, &mut csbi) != 0 {
-                
-                return Some((
-                    (csbi.srWindow.Right - csbi.srWindow.Left + 1).max(0) as usize,
-                    (csbi.srWindow.Bottom - csbi.srWindow.Top + 1).max(0) as usize,
-                ));
-            }
+                let mut csbi: CONSOLE_SCREEN_BUFFER_INFO = mem::zeroed();
+                if GetConsoleScreenBufferInfo(handle, &mut csbi) != 0 {
+                    return Some((
+                        (csbi.srWindow.Right - csbi.srWindow.Left + 1).max(0) as usize,
+                        (csbi.srWindow.Bottom - csbi.srWindow.Top + 1).max(0) as usize,
+                    ));
+                }
             }
         }
 
@@ -255,29 +388,34 @@ pub mod terminal {
         let stdout = std::io::stdout();
         let mut handle = stdout.lock();
 
+        let mut last: Option<(u8, u8)> = None;
+
         // Clear screen and move cursor to top left
-        write!(handle, "{ESC}[2j{ESC}[h").map_err(|_| "Failed to write to handle")?;
+        write!(handle, "{ESC}[2J{ESC}[H").map_err(|_| "Failed to write to handle")?;
 
         // Get terminal size
         let (width, height) = size().ok_or("Failed to get display size")?;
 
         // Write elements to screen
         for y in 0..height {
+            let mut line = Vec::with_capacity(width);
             for x in 0..width {
-                // Write the current element
-                write!(
-                    handle,
-                    "{}",
-                    elements
-                        .get(x + y * width)
-                        .ok_or("Index out of bounds")?
-                        .to_string()
-                )
-                .map_err(|_| "Failed to write to handle")?;
+                let element = elements.get(x + y * width).ok_or("Index out of bounds")?;
+
+                if last.is_none() || last.unwrap().0 != element.foreground_code {
+                    line.push(element.fg());
+                }
+
+                if last.is_none() || last.unwrap().1 != element.background_code {
+                    line.push(element.bg());
+                }
+
+                line.push(element.char().to_string());
+
+                last = Some((element.foreground_code, element.background_code));
             }
 
-            // Next line
-            writeln!(handle).map_err(|_| "Failed to write to handle")?;
+            writeln!(handle, "{}", line.join("")).map_err(|_| "Failed to write to handle")?;
         }
 
         // Flush handle
