@@ -571,25 +571,24 @@ pub mod terminal {
 
     /// Converts a color from RGB to ASCII-256
     ///
+    /// Colors must be between 0-5. Any values above this range will be
+    /// set to 5 instead.
+    ///
     /// # Examples
     /// ```
-    /// let color = rgb(0, 50, 0); // dark green
-    /// let color = rgb(255, 0, 255); // bright magenta
-    /// let color = rgb(120, 120, 120); // grey
+    /// let color = rgb(0, 1, 0); // dark green
+    /// let color = rgb(5, 0, 5); // bright magenta
+    /// let color = rgb(3, 3, 3); // grey
     /// ```
     pub fn rgb(r: u8, g: u8, b: u8) -> u8 {
-        // Helper function to normalize the color correctly
-        fn normalize_color<T: Into<f32>>(v: T) -> u8 {
-            (v.into() / 42.0).clamp(0.0, 5.0) as u8
-        }
-
-        let (r, g, b) = (normalize_color(r), normalize_color(g), normalize_color(b));
-        println!("({r}, {g}, {b})");
+        let r = r.clamp(0, 5);
+        let g = g.clamp(0, 5);
+        let b = b.clamp(0, 5);
 
         if r == g && r == b {
             if r == 0 {
                 16
-            } else if r == 5 {
+            } else if r == 6 {
                 255
             } else {
                 232 + r * 4

@@ -1,4 +1,4 @@
-use core::rand::vec_range;
+use core::rand::{rand, range, vec_range};
 use std::time::Duration;
 
 use sprites::Firework;
@@ -12,8 +12,23 @@ fn main() {
 
     let (width, height) = core::terminal::size().unwrap();
 
-    let firework = Firework::new(100, 50);
-    let mut vec = vec![firework];
+    let x = range(50, 150);
+    let y = range(50, 80);
+    let r = range(0, 5);
+    let g = range(0, 5);
+    let b = range(0, 5);
+
+    let mut vec = vec![];
+    for _ in 0..3 {
+        let x = range(50, 150);
+        let y = range(50, 80);
+        let r = range(0, 5);
+        let g = range(0, 5);
+        let b = range(0, 5);
+
+        let firework = Firework::new(x, y, r, g, b);
+        vec.push(firework);
+    }
 
     let mut input = [0u8; 1]; // Buffer for reading one byte at a time
     loop {
@@ -26,11 +41,15 @@ fn main() {
         //     break;
         // }
 
+        // if input[0] == b'f' {
+        //     println!("\nYou pressed 'f'. Fireworking...");
+        // }
+
         let mut r = 0;
         let mut g = 0;
         let mut b = 0;
 
-        let mut page = Vec::new();
+        //let mut page = Vec::new();
         let fg = 10;
         let bg = 0;
         let mut rng = vec_range::<u8>(40, 100, width * height).into_iter();
@@ -56,18 +75,17 @@ fn main() {
                 let b = perlin.sample((x as f32 + 10.0) / 4.0, y as f32 / 4.0, 0.0, 255.0) as u8;
 
                 let c = rng.next().unwrap() as char;
-                page.push(core::terminal::Element::new(c, v, 232));
+                //page.push(core::terminal::Element::new(c, v, 232));
                 // fg += core::rand_range(0, 2);
                 // bg -= core::rand_range(0, 2);
             }
         }
 
-        core::terminal::display_raw(&page).unwrap();
-        //core::terminal::display(&mut vec).unwrap();
+        // core::terminal::display_raw(&page).unwrap();
+        core::terminal::display(&mut vec).unwrap();
 
         // Print the raw key that was pressed (no echo in raw mode)
         println!("You pressed: {}", input[0] as char);
-        std::thread::sleep(Duration::from_secs(3));
     }
 
     drop(handle);
