@@ -7,7 +7,7 @@ pub struct Firework {
 }
 
 impl Firework {
-    pub fn new() -> Self {
+    pub fn new(fx: usize, fy: usize) -> Self {
         let rand = crate::core::rand::vec_range(-2.0, 5.0, 256);
         let rand2 = crate::core::rand::vec_range(-3.0, 0.0, 256);
         let mut elements = Vec::with_capacity(rand.len());
@@ -17,7 +17,7 @@ impl Firework {
             let x = rand.next().unwrap();
             let y = rand2.next().unwrap();
 
-            elements.push((100.0, 50.0, x, y));
+            elements.push((fx as f32, fy as f32, x, y));
         }
 
         Self {
