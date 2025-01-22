@@ -332,15 +332,15 @@ pub mod terminal {
     }
 
     impl Element {
-        fn char(&self) -> char {
+        pub fn char(&self) -> char {
             self.char
         }
 
-        fn fg(&self) -> String {
+        pub fn fg(&self) -> String {
             format!("{ESC}[38;5;{}m", self.fg_code)
         }
 
-        fn bg(&self) -> String {
+        pub fn bg(&self) -> String {
             format!("{ESC}[48;5;{}m", self.bg_code)
         }
     }
