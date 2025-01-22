@@ -1,4 +1,4 @@
-use core::rand_vec_range;
+use core::rand::vec_range;
 
 mod core;
 
@@ -22,7 +22,7 @@ fn main() {
         let mut page = Vec::new();
         let fg = 10;
         let bg = 0;
-        let mut rng = rand_vec_range::<u8>(40, 100, width * height * 2).into_iter();
+        let mut rng = vec_range::<u8>(40, 100, width * height * 2).into_iter();
         for _ in 0..width {
             for _ in 0..height {
                 let c = rng.next().unwrap() as char;

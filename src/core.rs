@@ -1,176 +1,178 @@
 #![allow(dead_code)]
 
-#[cfg(unix)]
-use std::io::Read;
-
-/// Generates a ```Vec``` of random numbers
-///
-/// # Examples
-/// ```
-/// let random_chars = rand::<char>(200);
-/// let random_u8s: Vec<u8> = rand(25);
-/// ```
-pub fn rand_vec<T: Default + Copy>(len: usize) -> Vec<T> {
+pub mod rand {
     #[cfg(unix)]
-    {
-        let mut buffer = vec![0u8; len * size_of::<T>()]; // Allocate buffer for N elements of T
-        std::fs::File::open("/dev/urandom")
-            .expect("Failed to open /dev/urandom")
-            .read_exact(&mut buffer)
-            .expect("Failed to read random bytes");
+    use std::io::Read;
 
-        let mut result: Vec<T> = Vec::with_capacity(len);
-        unsafe {
-            for chunk in buffer.chunks_exact(size_of::<T>()) {
-                let mut element: T = T::default();
-                std::ptr::copy_nonoverlapping(
-                    chunk.as_ptr(),
-                    &mut element as *mut T as *mut u8,
-                    size_of::<T>(),
-                );
-                result.push(element);
+    /// Generates a ```Vec``` of random numbers
+    ///
+    /// # Examples
+    /// ```
+    /// let random_chars = rand::<char>(200);
+    /// let random_u8s: Vec<u8> = rand(25);
+    /// ```
+    pub fn vec<T: Default + Copy>(len: usize) -> Vec<T> {
+        #[cfg(unix)]
+        {
+            let mut buffer = vec![0u8; len * size_of::<T>()]; // Allocate buffer for N elements of T
+            std::fs::File::open("/dev/urandom")
+                .expect("Failed to open /dev/urandom")
+                .read_exact(&mut buffer)
+                .expect("Failed to read random bytes");
+
+            let mut result: Vec<T> = Vec::with_capacity(len);
+            unsafe {
+                for chunk in buffer.chunks_exact(size_of::<T>()) {
+                    let mut element: T = T::default();
+                    std::ptr::copy_nonoverlapping(
+                        chunk.as_ptr(),
+                        &mut element as *mut T as *mut u8,
+                        size_of::<T>(),
+                    );
+                    result.push(element);
+                }
             }
+
+            result
         }
 
+        #[cfg(windows)]
+        {
+            todo!()
+        }
+    }
+
+    /// Generates a random number
+    ///
+    /// I have no idea if this is cryptographically secure so please don't use it
+    /// for anything like that.
+    ///
+    /// # Examples
+    /// ```
+    /// let random_char = rand::<char>();
+    /// let random_u8: u8 = rand();
+    /// ```
+    pub fn rand<T: Default + Copy>() -> T {
+        #[cfg(unix)]
+        {
+            let mut buffer = vec![0u8; size_of::<T>()];
+            std::fs::File::open("/dev/urandom")
+                .expect("Failed to open /dev/urandom")
+                .read_exact(&mut buffer)
+                .expect("Failed to read random bytes");
+
+            let mut result: T = T::default();
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    buffer.as_ptr(),
+                    &mut result as *mut T as *mut u8,
+                    size_of::<T>(),
+                );
+            }
+            return result;
+        }
+
+        #[cfg(windows)]
+        {
+            todo!()
+        }
+    }
+
+    /// Generates a ```Vec``` of random numbers within a range using ```rand()```
+    ///
+    /// # Examples
+    /// ```
+    /// let random_chars = rand_vec_range::<u8>(0, 100, 200) as char;
+    /// let random_u8s: Vec<u8> = rand_vec_range(0, 10, 25);
+    /// ```
+    pub fn vec_range<
+        T: Default
+            + Copy
+            + std::ops::Sub
+            + std::ops::Add
+            + std::ops::Rem
+            + std::convert::From<<T as std::ops::Sub>::Output>
+            + std::convert::From<<T as std::ops::Add>::Output>
+            + std::convert::From<<T as std::ops::Rem>::Output>
+            + PartialEq
+            + PartialOrd,
+    >(
+        min: T,
+        max: T,
+        len: usize,
+    ) -> Vec<T> {
+        if min == max {
+            return vec![min; len];
+        }
+
+        vec::<T>(len)
+            .into_iter()
+            .map(|value| {
+                let modulo: T = (max - min).into();
+                let result: T = (value % modulo).into();
+                let result: T = (result + min).into();
+                result
+            })
+            .collect()
+    }
+
+    /// Generates a random number within a range using ```rand()```
+    ///
+    /// # Examples
+    /// ```
+    /// let random_char = rand_range::<u8>(0, 100) as char;
+    /// let random_u8: u8 = rand_range(0, 10);
+    /// ```
+    pub fn range<
+        T: Default
+            + Copy
+            + std::ops::Sub
+            + std::ops::Add
+            + std::ops::Rem
+            + std::convert::From<<T as std::ops::Sub>::Output>
+            + std::convert::From<<T as std::ops::Add>::Output>
+            + std::convert::From<<T as std::ops::Rem>::Output>
+            + PartialEq
+            + std::cmp::PartialOrd,
+    >(
+        min: T,
+        max: T,
+    ) -> T {
+        if min == max {
+            return min;
+        }
+
+        let value: T = rand();
+        let modulo: T = (max - min).into();
+        let result: T = (value % modulo).into();
+        let result: T = (result + min).into();
         result
     }
 
-    #[cfg(windows)]
-    {
-        todo!()
-    }
-}
-
-/// Generates a random number
-///
-/// I have no idea if this is cryptographically secure so please don't use it
-/// for anything like that.
-///
-/// # Examples
-/// ```
-/// let random_char = rand::<char>();
-/// let random_u8: u8 = rand();
-/// ```
-pub fn rand<T: Default + Copy>() -> T {
-    #[cfg(unix)]
-    {
-        let mut buffer = vec![0u8; size_of::<T>()];
-        std::fs::File::open("/dev/urandom")
-            .expect("Failed to open /dev/urandom")
-            .read_exact(&mut buffer)
-            .expect("Failed to read random bytes");
-
-        let mut result: T = T::default();
-        unsafe {
-            std::ptr::copy_nonoverlapping(
-                buffer.as_ptr(),
-                &mut result as *mut T as *mut u8,
-                size_of::<T>(),
-            );
+    /// Shuffles a vector using ```rand()```
+    ///
+    /// # Example
+    /// ```
+    /// let mut vec: Vec<_> = (0..5).collect();
+    /// shuffle(&mut vec);
+    /// ```
+    pub fn shuffle<
+        T: Default
+            + Copy
+            + std::ops::Sub
+            + std::ops::Add
+            + std::ops::Rem
+            + std::convert::From<<T as std::ops::Sub>::Output>
+            + std::convert::From<<T as std::ops::Add>::Output>
+            + std::convert::From<<T as std::ops::Rem>::Output>
+            + PartialEq,
+    >(
+        vec: &mut Vec<T>,
+    ) {
+        for i in 0..vec.len() {
+            let j = range(0, vec.len() - 1);
+            vec.swap(i, j);
         }
-        return result;
-    }
-
-    #[cfg(windows)]
-    {
-        todo!()
-    }
-}
-
-/// Generates a ```Vec``` of random numbers within a range using ```rand()```
-///
-/// # Examples
-/// ```
-/// let random_chars = rand_vec_range::<u8>(0, 100, 200) as char;
-/// let random_u8s: Vec<u8> = rand_vec_range(0, 10, 25);
-/// ```
-pub fn rand_vec_range<
-    T: Default
-        + Copy
-        + std::ops::Sub
-        + std::ops::Add
-        + std::ops::Rem
-        + std::convert::From<<T as std::ops::Sub>::Output>
-        + std::convert::From<<T as std::ops::Add>::Output>
-        + std::convert::From<<T as std::ops::Rem>::Output>
-        + PartialEq
-        + PartialOrd,
->(
-    min: T,
-    max: T,
-    len: usize,
-) -> Vec<T> {
-    if min == max {
-        return vec![min; len];
-    }
-
-    rand_vec::<T>(len)
-        .into_iter()
-        .map(|value| {
-            let modulo: T = (max - min).into();
-            let result: T = (value % modulo).into();
-            let result: T = (result + min).into();
-            result
-        })
-        .collect()
-}
-
-/// Generates a random number within a range using ```rand()```
-///
-/// # Examples
-/// ```
-/// let random_char = rand_range::<u8>(0, 100) as char;
-/// let random_u8: u8 = rand_range(0, 10);
-/// ```
-pub fn rand_range<
-    T: Default
-        + Copy
-        + std::ops::Sub
-        + std::ops::Add
-        + std::ops::Rem
-        + std::convert::From<<T as std::ops::Sub>::Output>
-        + std::convert::From<<T as std::ops::Add>::Output>
-        + std::convert::From<<T as std::ops::Rem>::Output>
-        + PartialEq
-        + std::cmp::PartialOrd,
->(
-    min: T,
-    max: T,
-) -> T {
-    if min == max {
-        return min;
-    }
-
-    let value: T = rand();
-    let modulo: T = (max - min).into();
-    let result: T = (value % modulo).into();
-    let result: T = (result + min).into();
-    result
-}
-
-/// Shuffles a vector using ```rand()```
-///
-/// # Example
-/// ```
-/// let mut vec: Vec<_> = (0..5).collect();
-/// shuffle(&mut vec);
-/// ```
-pub fn shuffle<
-    T: Default
-        + Copy
-        + std::ops::Sub
-        + std::ops::Add
-        + std::ops::Rem
-        + std::convert::From<<T as std::ops::Sub>::Output>
-        + std::convert::From<<T as std::ops::Add>::Output>
-        + std::convert::From<<T as std::ops::Rem>::Output>
-        + PartialEq,
->(
-    vec: &mut Vec<T>,
-) {
-    for i in 0..vec.len() {
-        let j = rand_range(0, vec.len() - 1);
-        vec.swap(i, j);
     }
 }
 
@@ -179,53 +181,6 @@ pub fn shuffle<
 /// Most of the functions in this module are just abtractions over platform
 /// specific code.
 pub mod terminal {
-    pub const ESC: &'static str = "\x1b";
-
-    /// Represents an element on the screen.
-    ///
-    /// See https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797#256-colors
-    /// for what colors are able to be used.
-    pub struct Element {
-        character: char,
-        foreground_code: u8,
-        background_code: u8,
-    }
-
-    impl Element {
-        pub fn new(character: char, foreground_code: u8, background_code: u8) -> Self {
-            Self {
-                character,
-                foreground_code,
-                background_code,
-            }
-        }
-    }
-
-    impl ToString for Element {
-        fn to_string(&self) -> String {
-            format!(
-                "{ESC}[38;5;{foreground}m{ESC}[48;5;{background}m{character}",
-                foreground = self.foreground_code,
-                background = self.background_code,
-                character = self.character
-            )
-        }
-    }
-
-    impl Element {
-        fn char(&self) -> char {
-            self.character
-        }
-
-        fn fg(&self) -> String {
-            format!("{ESC}[38;5;{}m", self.foreground_code)
-        }
-
-        fn bg(&self) -> String {
-            format!("{ESC}[48;5;{}m", self.background_code)
-        }
-    }
-
     use std::{io::Write, mem};
 
     #[cfg(unix)]
@@ -244,6 +199,46 @@ pub mod terminal {
         winbase::STD_OUTPUT_HANDLE,
         wincon::{GetConsoleScreenBufferInfo, CONSOLE_SCREEN_BUFFER_INFO},
     };
+
+    /// Represents an escape character
+    pub const ESC: &'static str = "\x1b";
+
+    pub const SCREEN_BUFFER_ALT: &'static str = "\x1b[?1049h\x1b[2J\x1b[H";
+    pub const SCREEN_BUFFER_DEF: &'static str = "\x1b[2J\x1b[H\x1b[?10491";
+
+    /// Represents an element on the screen.
+    ///
+    /// See https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797#256-colors
+    /// for what colors are able to be used.
+    pub struct Element {
+        char: char,
+        fg_code: u8,
+        bg_code: u8,
+    }
+
+    impl Element {
+        pub fn new(character: char, foreground_code: u8, background_code: u8) -> Self {
+            Self {
+                char: character,
+                fg_code: foreground_code,
+                bg_code: background_code,
+            }
+        }
+    }
+
+    impl Element {
+        fn char(&self) -> char {
+            self.char
+        }
+
+        fn fg(&self) -> String {
+            format!("{ESC}[38;5;{}m", self.fg_code)
+        }
+
+        fn bg(&self) -> String {
+            format!("{ESC}[48;5;{}m", self.bg_code)
+        }
+    }
 
     /// Handle to hold terminal values.
     ///
@@ -268,9 +263,9 @@ pub mod terminal {
                 eprintln!("Failed to restore terminal attributes")
             }
 
-            // Clear screen and reset cursor
+            // Switch to original screen buffer, clear screen and reset cursor
             let mut stdout = std::io::stdout();
-            write!(stdout, "{ESC}[2j{ESC}[h").unwrap();
+            write!(stdout, "{SCREEN_BUFFER_DEF}{ESC}[h").unwrap();
             stdout.flush().unwrap();
         }
     }
@@ -320,6 +315,13 @@ pub mod terminal {
                 return Err("Failed to set terminal attributes");
             }
 
+            let stdout = std::io::stdout();
+            let mut handle = stdout.lock();
+
+            // Switch to alternate screen buffer
+            //write!(handle, "{SCREEN_BUFFER_ALT}").map_err(|_| "Failed to write to handle")?;
+            handle.flush().map_err(|_| "Failed to flush handle")?;
+
             return Ok(Handle {
                 original_termios,
                 _termios: termios,
@@ -328,6 +330,12 @@ pub mod terminal {
 
         #[cfg(windows)]
         {
+            let stdout = std::io::stdout();
+            let mut handle = stdout.lock();
+
+            // Switch to alternate screen buffer
+            write!(handle, "{SCREEN_BUFFER_ALT}").map_err(|_| "Failed to write to handle")?;
+
             return Ok(Handle {});
         }
     }
@@ -388,35 +396,38 @@ pub mod terminal {
         let stdout = std::io::stdout();
         let mut handle = stdout.lock();
 
-        let mut last: Option<(u8, u8)> = None;
-
-        // Clear screen and move cursor to top left
-        write!(handle, "{ESC}[2J{ESC}[H").map_err(|_| "Failed to write to handle")?;
-
         // Get terminal size
         let (width, height) = size().ok_or("Failed to get display size")?;
 
-        // Write elements to screen
-        for y in 0..height {
-            let mut line = Vec::with_capacity(width);
-            for x in 0..width {
-                let element = elements.get(x + y * width).ok_or("Index out of bounds")?;
+        // Use a buffer for efficient printing
+        // Don't entirely know why I need to add 33 specifically but if I don't the buffer will resize
+        let mut buf = String::with_capacity(height * width + height + 33);
 
-                if last.is_none() || last.unwrap().0 != element.foreground_code {
-                    line.push(element.fg());
-                }
+        // Clear screen
+        buf.push_str("{ESC}[2J{ESC}[H");
 
-                if last.is_none() || last.unwrap().1 != element.background_code {
-                    line.push(element.bg());
-                }
-
-                line.push(element.char().to_string());
-
-                last = Some((element.foreground_code, element.background_code));
+        // Push elements to the buffer
+        let mut last: Option<(u8, u8)> = None;
+        for i in 0..(height * width) {
+            if i != 0 && i % width == 0 {
+                buf.push('\n');
             }
 
-            writeln!(handle, "{}", line.join("")).map_err(|_| "Failed to write to handle")?;
+            let element = elements.get(i).ok_or("Index out of bounds")?;
+
+            if last.is_none() || last.unwrap().0 != element.fg_code {
+                buf.push_str(&element.fg());
+            }
+
+            if last.is_none() || last.unwrap().1 != element.bg_code {
+                buf.push_str(&element.bg());
+            }
+
+            buf.push_str(&element.char().to_string());
+
+            last = Some((element.fg_code, element.bg_code));
         }
+        write!(handle, "{}", buf).map_err(|_| "Failed to write to handle")?;
 
         // Flush handle
         handle.flush().map_err(|_| "Failed to flush handle")?;
