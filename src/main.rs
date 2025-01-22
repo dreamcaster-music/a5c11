@@ -23,11 +23,16 @@ fn main() {
         let fg = 10;
         let bg = 0;
         let mut rng = vec_range::<u8>(40, 100, width * height).into_iter();
-        for _ in 0..(width * height) {
-            let c = rng.next().unwrap() as char;
-            page.push(core::terminal::Element::new(c, fg, bg));
-            // fg += core::rand_range(0, 2);
-            // bg -= core::rand_range(0, 2);
+        let perlin = core::rand::Perlin::new();
+        for x in 0..width {
+            for y in 0..height {
+                let v = perlin.sample(x as f32 / 4.0, y as f32 / 4.0, 220.0, 255.0) as u8;
+
+                let c = rng.next().unwrap() as char;
+                page.push(core::terminal::Element::new(c, v, 232));
+                // fg += core::rand_range(0, 2);
+                // bg -= core::rand_range(0, 2);
+            }
         }
 
         core::terminal::display(&page).unwrap();

@@ -174,6 +174,109 @@ pub mod rand {
             vec.swap(i, j);
         }
     }
+
+    /// Represents a Perlin noise permutation which can be used to sample
+    /// Perlin noise from.
+    ///
+    /// # Example
+    /// ```
+    /// let perlin = Perlin::new();
+    /// let a = perlin.sample(0.5, 1.5, 0.0, 255.0);
+    /// let b = perlin.sample(1.5, 3.5, 0.0, 255.0);
+    /// ```
+    pub struct Perlin {
+        size: usize,
+        permutation: Vec<usize>,
+    }
+
+    /// # Example
+    /// ```
+    /// let perlin = Perlin::new();
+    /// ```
+    impl Perlin {
+        /// Generate a new Perlin noise permutation which can be used to sample
+        /// from.
+        pub fn new() -> Self {
+            let size = 256;
+
+            let mut permutation: Vec<usize> = (0..size).collect();
+            shuffle(&mut permutation);
+
+            Self { size, permutation }
+        }
+
+        /// Sample Perlin noise at the specified coordinate, with the specified
+        /// miniumum and maximum values.
+        ///
+        /// # Example
+        /// ```
+        /// let a = perlin.sample(0.5, 1.5, 0.0, 255.0);
+        /// let b = perlin.sample(1.5, 3.5, 0.0, 255.0);
+        /// ```
+        pub fn sample(&self, x: f32, y: f32, min: f32, max: f32) -> f32 {
+            let fade = |t: f32| t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+            let lerp = |a: f32, b: f32, t: f32| a + t * (b - a);
+            let grad = |hash: usize, x: f32, y: f32| {
+                let h = hash & 15;
+                let u = if h < 8 { x } else { y };
+                let v = if h < 4 {
+                    y
+                } else if h == 12 || h == 14 {
+                    x
+                } else {
+                    0.0
+                };
+                (if (h & 1) == 0 { u } else { -u }) + (if (h & 2) == 0 { v } else { -v })
+            };
+
+            // Determine grid cell coordinates
+            let x_floor = x.floor() as usize & 255;
+            let y_floor = y.floor() as usize & 255;
+
+            // Relative coordinates in grid cell
+            let xf = x - x.floor();
+            let yf = y - y.floor();
+
+            // Fade curves for smooth interpolation
+            let u = fade(xf);
+            let v = fade(yf);
+
+            // Hash coordinates of the 4 corners
+            let aa = self.permutation[(x_floor + self.permutation[y_floor]) % self.size] as f32;
+            let ab = self.permutation
+                [(x_floor + self.permutation[(y_floor + 1) % self.size]) % self.size]
+                as f32;
+            let ba = self.permutation[(x_floor + 1 + self.permutation[y_floor]) % self.size] as f32;
+            let bb = self.permutation
+                [(x_floor + 1 + self.permutation[(y_floor + 1) % self.size]) % self.size]
+                as f32;
+
+            // Interpolate along x axis
+            let x1 = lerp(
+                grad(aa as usize, xf, yf),
+                grad(ba as usize, xf - 1.0, yf),
+                u,
+            );
+            let x2 = lerp(
+                grad(ab as usize, xf, yf - 1.0),
+                grad(bb as usize, xf - 1.0, yf - 1.0),
+                u,
+            );
+
+            // Interpolate along y axis
+            let value = lerp(x1, x2, v);
+            Self::normalize(value, min, max)
+        }
+
+        /// Normalize a Perlin noise value between a minimum and a maximum
+        fn normalize(value: f32, min: f32, max: f32) -> f32 {
+            // Normalize the value from [-1, 1] to [0, 1]
+            let normalized = (value + 1.0) / 2.0;
+
+            // Scale the normalized value to [min, max]
+            normalized * (max - min) + min
+        }
+    }
 }
 
 /// Controls functionality of the terminal.
