@@ -568,6 +568,45 @@ pub mod terminal {
 
         Ok(())
     }
+
+    /// Converts a color from RGB to ASCII-256
+    ///
+    /// # Examples
+    /// ```
+    /// let color = rgb(0, 50, 0); // dark green
+    /// let color = rgb(255, 0, 255); // bright magenta
+    /// let color = rgb(120, 120, 120); // grey
+    /// ```
+    pub fn rgb(r: u8, g: u8, b: u8) -> u8 {
+        // Helper function to normalize the color correctly
+        fn normalize_color<T: Into<f32>>(v: T) -> u8 {
+            (v.into() / 42.0).clamp(0.0, 5.0) as u8
+        }
+
+        let (r, g, b) = (normalize_color(r), normalize_color(g), normalize_color(b));
+        println!("({r}, {g}, {b})");
+
+        if r == g && r == b {
+            if r == 0 {
+                16
+            } else if r == 5 {
+                255
+            } else {
+                232 + r * 4
+            }
+        } else {
+            const R: u8 = 36;
+            const G: u8 = 6;
+            const B: u8 = 1;
+
+            let mut color = 0;
+            color += b.min(G);
+            color += g.min(R) * G;
+            color += r * R;
+
+            color + 16
+        }
+    }
 }
 
 /// Represents a position on the screen
