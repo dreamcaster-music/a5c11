@@ -265,7 +265,7 @@ pub mod terminal {
 
             // Switch to original screen buffer, clear screen and reset cursor
             let mut stdout = std::io::stdout();
-            write!(stdout, "{SCREEN_BUFFER_DEF}{ESC}[h").unwrap();
+            //write!(stdout, "{SCREEN_BUFFER_DEF}{ESC}[h").unwrap();
             stdout.flush().unwrap();
         }
     }
@@ -401,18 +401,14 @@ pub mod terminal {
 
         // Use a buffer for efficient printing
         // Don't entirely know why I need to add 33 specifically but if I don't the buffer will resize
-        let mut buf = String::with_capacity(height * width + height + 33);
+        let mut buf = String::with_capacity(height * width);
 
         // Clear screen
-        buf.push_str("{ESC}[2J{ESC}[H");
+        buf.push_str("\x1b[2J\x1b[H");
 
         // Push elements to the buffer
         let mut last: Option<(u8, u8)> = None;
         for i in 0..(height * width) {
-            if i != 0 && i % width == 0 {
-                buf.push('\n');
-            }
-
             let element = elements.get(i).ok_or("Index out of bounds")?;
 
             if last.is_none() || last.unwrap().0 != element.fg_code {
