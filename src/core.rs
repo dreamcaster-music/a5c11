@@ -319,7 +319,7 @@ pub mod terminal {
             let mut handle = stdout.lock();
 
             // Switch to alternate screen buffer
-            //write!(handle, "{SCREEN_BUFFER_ALT}").map_err(|_| "Failed to write to handle")?;
+            write!(handle, "{SCREEN_BUFFER_ALT}").map_err(|_| "Failed to write to handle")?;
             handle.flush().map_err(|_| "Failed to flush handle")?;
 
             return Ok(Handle {
@@ -335,6 +335,7 @@ pub mod terminal {
 
             // Switch to alternate screen buffer
             write!(handle, "{SCREEN_BUFFER_ALT}").map_err(|_| "Failed to write to handle")?;
+            handle.flush().map_err(|_| "Failed to flush handle")?;
 
             return Ok(Handle {});
         }
