@@ -88,14 +88,11 @@ pub mod rand {
     pub fn vec_range<
         T: Default
             + Copy
-            + std::ops::Sub
-            + std::ops::Add
-            + std::ops::Rem
-            + std::convert::From<<T as std::ops::Sub>::Output>
-            + std::convert::From<<T as std::ops::Add>::Output>
-            + std::convert::From<<T as std::ops::Rem>::Output>
-            + PartialEq
-            + PartialOrd,
+            + std::ops::Add<Output = T>
+            + std::ops::Sub<Output = T>
+            + std::ops::Rem<Output = T>
+            + PartialOrd
+            + PartialEq,
     >(
         min: T,
         max: T,
@@ -108,9 +105,12 @@ pub mod rand {
         vec::<T>(len)
             .into_iter()
             .map(|value| {
-                let modulo: T = (max - min).into();
-                let result: T = (value % modulo).into();
-                let result: T = (result + min).into();
+                // Compute the range size
+                let range_size = max - min;
+
+                // Ensure the random value is within the range
+                let result = (value % range_size) + min;
+
                 result
             })
             .collect()
@@ -126,26 +126,31 @@ pub mod rand {
     pub fn range<
         T: Default
             + Copy
-            + std::ops::Sub
-            + std::ops::Add
-            + std::ops::Rem
-            + std::convert::From<<T as std::ops::Sub>::Output>
-            + std::convert::From<<T as std::ops::Add>::Output>
-            + std::convert::From<<T as std::ops::Rem>::Output>
-            + PartialEq
-            + std::cmp::PartialOrd,
+            + std::ops::Add<Output = T>
+            + std::ops::Sub<Output = T>
+            + std::ops::Rem<Output = T>
+            + PartialOrd
+            + PartialEq,
     >(
         min: T,
         max: T,
     ) -> T {
+        if min > max {
+            panic!("min must be less than or equal to max");
+        }
         if min == max {
             return min;
         }
 
+        // Generate a random value using the custom `rand` function
         let value: T = rand();
-        let modulo: T = (max - min).into();
-        let result: T = (value % modulo).into();
-        let result: T = (result + min).into();
+
+        // Compute the range size
+        let range_size = max - min;
+
+        // Ensure the random value is within the range
+        let result = (value % range_size) + min;
+
         result
     }
 
@@ -189,10 +194,6 @@ pub mod rand {
         permutation: Vec<usize>,
     }
 
-    /// # Example
-    /// ```
-    /// let perlin = Perlin::new();
-    /// ```
     impl Perlin {
         /// Generate a new Perlin noise permutation which can be used to sample
         /// from.
@@ -313,6 +314,7 @@ pub mod terminal {
     ///
     /// See https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797#256-colors
     /// for what colors are able to be used.
+    #[derive(Clone)]
     pub struct Element {
         char: char,
         fg_code: u8,
@@ -494,9 +496,9 @@ pub mod terminal {
     /// # Example
     ///
     /// ```
-    /// display(&vec![]).unwrap();
+    /// display_raw(&vec![]).unwrap();
     /// ```
-    pub fn display(elements: &Vec<Element>) -> Result<(), &'static str> {
+    pub fn display_raw(elements: &Vec<Element>) -> Result<(), &'static str> {
         let stdout = std::io::stdout();
         let mut handle = stdout.lock();
 
@@ -534,4 +536,45 @@ pub mod terminal {
 
         Ok(())
     }
+
+    /// Displays a list of ```Sprite```s on the screen.
+    pub fn display(sprites: &mut Vec<impl super::Sprite>) -> Result<(), &'static str> {
+        let (width, height) = size().ok_or("Failed to get display size")?;
+        let mut display = (0..(width * height))
+            .map(|_| Element::new(' ', 0, 0))
+            .collect::<Vec<_>>();
+
+        for sprite in sprites.iter_mut() {
+            for element in sprite.elements() {
+                let (x, y) = (element.1 .0, element.1 .1);
+
+                let x = x.floor();
+                let y = y.floor();
+                if x < 0.0 || y < 0.0 {
+                    continue;
+                }
+                let x = x as usize;
+                let y = y as usize;
+
+                if x < width && y < height {
+                    display[y * width + x] = element.0;
+                }
+            }
+
+            sprite.next();
+        }
+
+        display_raw(&display)?;
+
+        Ok(())
+    }
+}
+
+/// Represents a position on the screen
+pub struct Position(pub f32, pub f32);
+
+/// Represents a sprite that can be displayed on the screen
+pub trait Sprite {
+    fn elements(&self) -> Vec<(terminal::Element, Position)>;
+    fn next(&mut self);
 }
