@@ -1,5 +1,4 @@
 use core::rand::{rand, range, vec_range};
-use std::time::Duration;
 
 use sprites::Firework;
 use std::{thread, time::Duration};
