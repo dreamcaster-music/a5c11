@@ -380,7 +380,10 @@ pub mod rand {
 /// Most of the functions in this module are just abtractions over platform
 /// specific code.
 pub mod terminal {
-    use std::{io::Write, mem};
+    use std::{
+        io::{self, Write},
+        mem,
+    };
 
     #[cfg(unix)]
     use {
@@ -391,6 +394,15 @@ pub mod terminal {
         std::os::fd::AsRawFd,
     };
 
+    use winapi::um::{
+        consoleapi::GetConsoleMode,
+        wincon::{
+            GetConsoleCursorInfo, SetConsoleCursorInfo, CONSOLE_CURSOR_INFO,
+            ENABLE_VIRTUAL_TERMINAL_PROCESSING,
+        },
+        winnt::HANDLE,
+        winuser::ShowCursor,
+    };
     #[cfg(windows)]
     use winapi::um::{
         handleapi::INVALID_HANDLE_VALUE,
@@ -533,15 +545,42 @@ pub mod terminal {
         }
 
         #[cfg(windows)]
+        const STD_OUTPUT_HANDLE: u32 = -11i32 as u32; // Constant for standard output handle.
+
+        #[cfg(windows)]
         {
-            let stdout = std::io::stdout();
+            let stdout = io::stdout();
             let mut handle = stdout.lock();
 
+            unsafe {
+                let h_stdout: HANDLE = GetStdHandle(STD_OUTPUT_HANDLE);
+                if h_stdout == INVALID_HANDLE_VALUE {
+                    return Err("Failed to get standard output handle...");
+                }
+
+                // Enable virtual terminal processing for better control
+                let mut mode: u32 = 0;
+                if GetConsoleMode(h_stdout, &mut mode) == 0 {
+                    return Err("Failed to get console mode.");
+                }
+
+                if winapi::um::consoleapi::SetConsoleMode(
+                    h_stdout,
+                    mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING,
+                ) == 0
+                {
+                    return Err("Failed to set console mode.");
+                }
+            }
+
             // Switch to alternate screen buffer
-            write!(handle, "{SCREEN_BUFFER_ALT}").map_err(|_| "Failed to write to handle")?;
+            write!(handle, "\x1b[?1049h").map_err(|_| "Failed to write to handle")?;
             handle.flush().map_err(|_| "Failed to flush handle")?;
 
-            return Ok(Handle {});
+            // Hide the cursor using ANSI escape codes
+            write!(handle, "\x1b[?25l").map_err(|_| "Failed to write to handle")?;
+
+            Ok(Handle {})
         }
     }
 
