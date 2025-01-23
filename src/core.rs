@@ -709,7 +709,7 @@ pub mod terminal {
 }
 
 pub mod shapes {
-    use super::terminal::{self, Element};
+    use super::terminal::{self};
 
     /// Struct to represent a square.
     pub struct Square {
