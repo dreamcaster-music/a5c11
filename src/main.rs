@@ -2,14 +2,13 @@ use core::rand::{rand, range, vec_range};
 use std::time::Duration;
 
 use sprites::Firework;
+use std::{thread, time::Duration};
 
 mod core;
 mod sprites;
 
 fn main() {
-    // initialize terminal
     let handle = core::terminal::init().unwrap();
-
     let (width, height) = core::terminal::size().unwrap();
 
     let mut vec = vec![];

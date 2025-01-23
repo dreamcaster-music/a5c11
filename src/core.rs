@@ -4,6 +4,9 @@ pub mod rand {
     #[cfg(unix)]
     use std::io::Read;
 
+    use super::terminal;
+    use terminal::{size, Element};
+
     /// Generates a ```Vec``` of random numbers
     ///
     /// # Examples
@@ -38,7 +41,54 @@ pub mod rand {
 
         #[cfg(windows)]
         {
-            todo!()
+            use winapi::um::wincrypt::{
+                CryptAcquireContextA, CryptGenRandom, CryptReleaseContext, CRYPT_VERIFYCONTEXT,
+                HCRYPTPROV, PROV_RSA_FULL,
+            };
+            {
+                use std::mem::size_of;
+                use std::ptr::null_mut;
+
+                let mut h_provider: HCRYPTPROV = 0;
+                unsafe {
+                    if CryptAcquireContextA(
+                        &mut h_provider,
+                        null_mut(),
+                        null_mut(),
+                        PROV_RSA_FULL,
+                        CRYPT_VERIFYCONTEXT,
+                    ) == 0
+                    {
+                        panic!("Failed to acquire cryptographic context! NOT CYBER SECURE")
+                    }
+                }
+
+                let mut buffer = vec![0u8; len * size_of::<T>()];
+                unsafe {
+                    if CryptGenRandom(h_provider, buffer.len() as u32, buffer.as_mut_ptr()) == 0 {
+                        CryptReleaseContext(h_provider, 0);
+                        panic!("FAILED TO GENERATE RANDOM BYTES");
+                    }
+                }
+
+                unsafe {
+                    CryptReleaseContext(h_provider, 0);
+                }
+
+                let mut result: Vec<T> = Vec::with_capacity(len);
+                unsafe {
+                    for chunk in buffer.chunks_exact(size_of::<T>()) {
+                        let mut element: T = T::default();
+                        std::ptr::copy_nonoverlapping(
+                            chunk.as_ptr(),
+                            &mut element as *mut T as *mut u8,
+                            size_of::<T>(),
+                        );
+                        result.push(element);
+                    }
+                }
+                return result;
+            }
         }
     }
 
@@ -74,7 +124,52 @@ pub mod rand {
 
         #[cfg(windows)]
         {
-            todo!()
+            use std::ptr::null_mut;
+            use winapi::um::wincrypt::{
+                CryptAcquireContextA, CryptGenRandom, CryptReleaseContext, CRYPT_VERIFYCONTEXT,
+                HCRYPTPROV, PROV_RSA_FULL,
+            };
+
+            let mut h_provider: HCRYPTPROV = 0;
+            unsafe {
+                // Acquire a cryptographic provider context
+                if CryptAcquireContextA(
+                    &mut h_provider,
+                    null_mut(),
+                    null_mut(),
+                    PROV_RSA_FULL,
+                    CRYPT_VERIFYCONTEXT,
+                ) == 0
+                {
+                    panic!("Failed to acquire cryptographic context!");
+                }
+            }
+
+            let mut buffer = vec![0u8; std::mem::size_of::<T>()];
+            unsafe {
+                // Generate random bytes
+                if CryptGenRandom(h_provider, buffer.len() as u32, buffer.as_mut_ptr()) == 0 {
+                    CryptReleaseContext(h_provider, 0);
+                    panic!("Failed to generate random bytes!");
+                }
+            }
+
+            unsafe {
+                // Release the cryptographic provider context
+                CryptReleaseContext(h_provider, 0);
+            }
+
+            let mut result: T = T::default();
+            unsafe {
+                // Copy the random bytes into the result
+                std::ptr::copy_nonoverlapping(
+                    buffer.as_ptr(),
+                    &mut result as *mut T as *mut u8,
+                    std::mem::size_of::<T>(),
+                );
+            }
+
+            result
         }
     }
 
@@ -343,6 +438,10 @@ pub mod terminal {
         pub fn bg(&self) -> String {
             format!("{ESC}[48;5;{}m", self.bg_code)
         }
+        // Method to reverse the foreground and background colors
+        pub fn reverse_colors(&mut self) {
+            std::mem::swap(&mut self.fg_code, &mut self.bg_code);
+        }
     }
 
     /// Handle to hold terminal values.
@@ -604,6 +703,114 @@ pub mod terminal {
             color += r * R;
 
             color + 16
+        }
+    }
+}
+
+pub mod shapes {
+    use super::terminal::{self};
+
+    /// Struct to represent a square.
+    pub struct Square {
+        width: usize,
+        height: usize,
+        x: usize,
+        y: usize,
+        position: (usize, usize), // top-left by default
+    }
+
+    impl Square {
+        /// Create a new square with specified width, height, and position.
+        pub fn new(width: usize, height: usize, x: usize, y: usize) -> Self {
+            Self {
+                width,
+                height,
+                x,
+                y,
+                position: (x, y),
+            }
+        }
+
+        /// Draw the square at its position in the terminal.
+        pub fn draw(&self) {
+            for i in 0..self.height {
+                for j in 0..self.width {
+                    // Print spaces for the top-left position
+                    if i == 0 || i == self.height - 1 || j == 0 || j == self.width - 1 {
+                        print!("#");
+                    } else {
+                        print!(" ");
+                    }
+                }
+                println!();
+            }
+        }
+    }
+    pub struct Checkerboard {
+        width: usize,
+        height: usize,
+        fg_color1: u8, // Foreground color for the first color
+        bg_color1: u8, // Background color for the first color
+        fg_color2: u8, // Foreground color for the second color
+        bg_color2: u8, // Background color for the second color
+    }
+
+    impl Checkerboard {
+        // New constructor that accepts custom foreground and background colors
+        pub fn new(
+            width: usize,
+            height: usize,
+            fg_color1: u8,
+            bg_color1: u8,
+            fg_color2: u8,
+            bg_color2: u8,
+        ) -> Self {
+            Self {
+                width,
+                height,
+                fg_color1,
+                bg_color1,
+                fg_color2,
+                bg_color2,
+            }
+        }
+
+        // Update generate_elements to use the custom colors
+        pub fn generate_elements(&self) -> Vec<terminal::Element> {
+            let mut elements = Vec::with_capacity(self.width * self.height);
+
+            for row in 0..self.height {
+                for col in 0..self.width {
+                    // Alternating between '█' and ' ' based on row and column
+                    let ch = if (row + col) % 2 == 0 { '█' } else { ' ' };
+                    let fg_code = if (row + col) % 2 == 0 {
+                        self.fg_color1
+                    } else {
+                        self.fg_color2
+                    };
+                    let bg_code = if (row + col) % 2 == 0 {
+                        self.bg_color1
+                    } else {
+                        self.bg_color2
+                    };
+                    elements.push(terminal::Element::new(ch, fg_code, bg_code));
+                }
+            }
+
+            elements
+        }
+
+        // The reverse_colors method can remain the same unless you need to modify the color reversal logic
+        pub fn reverse_colors(&mut self) {
+            let elements = &mut self.generate_elements();
+            for element in elements.iter_mut() {
+                element.reverse_colors(); // Reverse colors of each element
+            }
+        }
+
+        pub fn draw(&self) {
+            let elements = self.generate_elements();
+            terminal::display_raw(&elements).unwrap();
         }
     }
 }
