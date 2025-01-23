@@ -12,3 +12,6 @@ libc = "0.2"
 winapi = { version = "0.3.9", features = [
     "consoleapi", "wincon", "processenv", "handleapi", "winbase", "fileapi", "synchapi", "winuser"
 ] }
+
+[dependencies]
+ffmpeg-next = "7.1.0"
