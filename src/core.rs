@@ -380,11 +380,21 @@ pub mod rand {
 /// Most of the functions in this module are just abtractions over platform
 /// specific code.
 pub mod terminal {
-    use std::{
-        io::{self, Write},
-        mem,
-    };
+    use std::{io::Write, mem};
 
+    #[cfg(windows)]
+    use winapi::um::{
+        consoleapi::GetConsoleMode,
+        handleapi::INVALID_HANDLE_VALUE,
+        processenv::GetStdHandle,
+        winbase::STD_OUTPUT_HANDLE,
+        wincon::{
+            GetConsoleCursorInfo, GetConsoleScreenBufferInfo, SetConsoleCursorInfo,
+            CONSOLE_CURSOR_INFO, CONSOLE_SCREEN_BUFFER_INFO, ENABLE_VIRTUAL_TERMINAL_PROCESSING,
+        },
+        winnt::HANDLE,
+        winuser::ShowCursor,
+    };
     #[cfg(unix)]
     use {
         libc::{
@@ -392,23 +402,6 @@ pub mod terminal {
             TCSANOW, TIOCGWINSZ, VMIN, VTIME,
         },
         std::os::fd::AsRawFd,
-    };
-
-    use winapi::um::{
-        consoleapi::GetConsoleMode,
-        wincon::{
-            GetConsoleCursorInfo, SetConsoleCursorInfo, CONSOLE_CURSOR_INFO,
-            ENABLE_VIRTUAL_TERMINAL_PROCESSING,
-        },
-        winnt::HANDLE,
-        winuser::ShowCursor,
-    };
-    #[cfg(windows)]
-    use winapi::um::{
-        handleapi::INVALID_HANDLE_VALUE,
-        processenv::GetStdHandle,
-        winbase::STD_OUTPUT_HANDLE,
-        wincon::{GetConsoleScreenBufferInfo, CONSOLE_SCREEN_BUFFER_INFO},
     };
 
     /// Represents an escape character
@@ -549,7 +542,7 @@ pub mod terminal {
 
         #[cfg(windows)]
         {
-            let stdout = io::stdout();
+            let stdout = std::io::stdout();
             let mut handle = stdout.lock();
 
             unsafe {
@@ -745,6 +738,8 @@ pub mod terminal {
         }
     }
 }
+
+pub mod keyboard {}
 
 pub mod shapes {
     use super::terminal::{self};
