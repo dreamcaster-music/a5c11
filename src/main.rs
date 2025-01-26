@@ -5,6 +5,7 @@ use std::{thread::sleep, time::Duration};
 use sprites::{Checkerboard, Firework};
 
 mod core;
+mod keyboard;
 mod sprites;
 
 fn main() {

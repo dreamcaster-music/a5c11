@@ -783,6 +783,7 @@ pub mod shapes {
 }
 
 /// Represents a position on the screen
+#[derive(Debug, Clone, PartialEq)]
 pub struct Position(pub f32, pub f32);
 
 /// Represents a sprite that can be displayed on the screen
