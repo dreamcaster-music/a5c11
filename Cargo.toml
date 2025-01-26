@@ -6,9 +6,19 @@ edition = "2021"
 # Unix specific dependencies
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+core-foundation = "0.10.0"
+io-kit-sys = "0.4.1"
 
 # Windows specific dependencies
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = [
-    "consoleapi", "wincon", "processenv", "handleapi", "winbase", "fileapi", "synchapi", "winuser", "wincrypt"
+	"consoleapi",
+	"wincon",
+	"processenv",
+	"handleapi",
+	"winbase",
+	"fileapi",
+	"synchapi",
+	"winuser",
+	"wincrypt",
 ] }
