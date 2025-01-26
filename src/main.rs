@@ -1,7 +1,7 @@
-use core::rand::{rand, range, vec_range};
+use core::terminal::rgb;
+use std::{thread::sleep, time::Duration};
 
-use sprites::Firework;
-use std::{thread, time::Duration};
+use sprites::Checkerboard;
 
 mod core;
 mod sprites;
@@ -11,18 +11,16 @@ fn main() {
     let (width, height) = core::terminal::size().unwrap();
 
     let mut vec = vec![];
-    for _ in 0..3 {
-        let x = range(0, width);
-        let y = range(0, height);
-        let r = range(0, 5);
-        let g = range(0, 5);
-        let b = range(0, 5);
+    let checkerboard = Checkerboard::new(
+        width,
+        height,
+        rgb(255, 0, 0),
+        rgb(5, 5, 5),
+        rgb(5, 5, 5),
+        rgb(255, 255, 255),
+    );
+    vec.push(checkerboard);
 
-        let firework = Firework::new(x, y, r, g, b);
-        vec.push(firework);
-    }
-
-    let mut input = [0u8; 1]; // Buffer for reading one byte at a time
     loop {
         // // Read one byte from stdin (should be non-blocking and immediate in raw mode)
         // std::io::Read::read_exact(&mut std::io::stdin(), &mut input).expect("Failed to read input");
@@ -48,9 +46,10 @@ fn main() {
 
         // core::terminal::display_raw(&page).unwrap();
         core::terminal::display(&mut vec).unwrap();
+        sleep(Duration::from_millis(500));
 
         // Print the raw key that was pressed (no echo in raw mode)
-        println!("You pressed: {}", input[0] as char);
+        // println!("You pressed: {}", input[0] as char);
     }
 
     drop(handle);

@@ -100,3 +100,71 @@ impl Sprite for Firework {
             .collect::<Vec<_>>()
     }
 }
+pub struct Checkerboard {
+    width: usize,
+    height: usize,
+    fg_color1: u8, // Foreground color for the first color
+    bg_color1: u8, // Background color for the first color
+    fg_color2: u8, // Foreground color for the second color
+    bg_color2: u8, // Background color for the second color
+    offset: usize,
+}
+
+impl Checkerboard {
+    // New constructor that accepts custom foreground and background colors
+    pub fn new(
+        width: usize,
+        height: usize,
+        fg_color1: u8,
+        bg_color1: u8,
+        fg_color2: u8,
+        bg_color2: u8,
+    ) -> Self {
+        Self {
+            width,
+            height,
+            fg_color1,
+            bg_color1,
+            fg_color2,
+            bg_color2,
+            offset: 0,
+        }
+    }
+}
+impl Sprite for Checkerboard {
+    // Update generate_elements to use the custom colors
+    fn elements(&self) -> Vec<(crate::core::terminal::Element, Position)> {
+        (0..(self.height * self.width))
+            .enumerate()
+            .map(|(_, i)| {
+                let x = i % self.width;
+                let y = (i - x) / self.width;
+                let z = (x + y) + self.offset;
+
+                // Alternating between '█' and ' ' based on row and column
+                let ch = if z % 2 == 0 { '█' } else { ' ' };
+
+                let fg_code = if z % 2 == 0 {
+                    self.fg_color1
+                } else {
+                    self.fg_color2
+                };
+
+                let bg_code = if z % 2 == 0 {
+                    self.bg_color1
+                } else {
+                    self.bg_color2
+                };
+
+                (
+                    Element::new(ch, fg_code, bg_code),
+                    Position(x as f32, y as f32),
+                )
+            })
+            .collect()
+    }
+
+    fn next(&mut self) {
+        self.offset = (self.offset + 1) % 2;
+    }
+}
