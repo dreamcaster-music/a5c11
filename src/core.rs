@@ -382,6 +382,7 @@ pub mod rand {
 pub mod terminal {
     use std::{io::Write, mem};
 
+    use super::Sprite;
     #[cfg(windows)]
     use winapi::um::{
         consoleapi::GetConsoleMode,
@@ -395,6 +396,7 @@ pub mod terminal {
         winnt::HANDLE,
         winuser::ShowCursor,
     };
+
     #[cfg(unix)]
     use {
         libc::{
@@ -429,9 +431,7 @@ pub mod terminal {
                 bg_code: background_code,
             }
         }
-    }
 
-    impl Element {
         pub fn char(&self) -> char {
             self.char
         }
@@ -669,7 +669,7 @@ pub mod terminal {
     }
 
     /// Displays a list of ```Sprite```s on the screen.
-    pub fn display(sprites: &mut Vec<impl super::Sprite>) -> Result<(), &'static str> {
+    pub fn display(sprites: &mut Vec<Box<dyn super::Sprite>>) -> Result<(), &'static str> {
         let (width, height) = size().ok_or("Failed to get display size")?;
         let mut display = (0..(width * height))
             .map(|_| Element::new(' ', 0, 0))

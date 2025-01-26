@@ -107,7 +107,7 @@ pub struct Checkerboard {
     bg_color1: u8, // Background color for the first color
     fg_color2: u8, // Foreground color for the second color
     bg_color2: u8, // Background color for the second color
-    offset: usize,
+    alt: bool,
 }
 
 impl Checkerboard {
@@ -127,7 +127,7 @@ impl Checkerboard {
             bg_color1,
             fg_color2,
             bg_color2,
-            offset: 0,
+            alt: false,
         }
     }
 }
@@ -139,22 +139,31 @@ impl Sprite for Checkerboard {
             .map(|(_, i)| {
                 let x = i % self.width;
                 let y = (i - x) / self.width;
-                let z = (x + y) + self.offset;
 
                 // Alternating between '█' and ' ' based on row and column
-                let ch = if z % 2 == 0 { '█' } else { ' ' };
+                let ch = if (x + y) % 2 == 0 { '█' } else { ' ' };
 
-                let fg_code = if z % 2 == 0 {
-                    self.fg_color1
-                } else {
-                    self.fg_color2
-                };
+                let fg_code;
+                let bg_code;
 
-                let bg_code = if z % 2 == 0 {
-                    self.bg_color1
+                if self.alt == false {
+                    fg_code = self.fg_color1;
+                    bg_code = self.bg_color1;
                 } else {
-                    self.bg_color2
-                };
+                    fg_code = self.fg_color2;
+                    bg_code = self.bg_color2;
+                }
+                // let fg_code = if (x + y) % 2 == 0 {
+                //     self.fg_color1
+                // } else {
+                //     self.fg_color2
+                // };
+
+                // let bg_code = if (x + y) % 2 == 0 {
+                //     self.bg_color1
+                // } else {
+                //     self.bg_color2
+                // };
 
                 (
                     Element::new(ch, fg_code, bg_code),
@@ -165,6 +174,6 @@ impl Sprite for Checkerboard {
     }
 
     fn next(&mut self) {
-        self.offset = (self.offset + 1) % 2;
+        self.alt = !self.alt;
     }
 }
