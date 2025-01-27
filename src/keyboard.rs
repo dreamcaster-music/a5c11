@@ -3,8 +3,6 @@ use std::{
     sync::{Mutex, OnceLock},
 };
 
-use core_foundation::base::TCFType;
-
 static KEYS: OnceLock<Mutex<Vec<Key>>> = OnceLock::new();
 static CALLBACK: OnceLock<Mutex<Option<Box<dyn Fn(Key, bool) + Send>>>> = OnceLock::new();
 
@@ -326,6 +324,50 @@ extern "C" fn input_value_callback(
     }
 }
 
+#[cfg(windows)]
+use std::ptr::null_mut;
+use winapi::shared::minwindef::{LPARAM, LRESULT, UINT, WPARAM};
+use winapi::shared::windef::HHOOK;
+use winapi::um::winuser::{
+    CallNextHookEx, GetMessageW, SetWindowsHookExW, KBDLLHOOKSTRUCT, WH_KEYBOARD_LL, WM_KEYDOWN,
+    WM_KEYUP,
+};
+
+unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    if code >= 0 {
+        let kb_struct = *(lparam as *const KBDLLHOOKSTRUCT);
+
+        let key = Key::from_code(kb_struct.vkCode as u8);
+        match key {
+            Some(key) => match key {
+                Key::Unknown => {}
+                key => match wparam as UINT {
+                    WM_KEYUP => {
+                        KEYS.get().unwrap().lock().unwrap().retain(|k| k != &key);
+
+                        match CALLBACK.get().unwrap().lock().unwrap().as_ref() {
+                            Some(func) => func(key, false),
+                            _ => {}
+                        }
+                    }
+                    WM_KEYDOWN => {
+                        KEYS.get().unwrap().lock().unwrap().push(key.clone());
+
+                        match CALLBACK.get().unwrap().lock().unwrap().as_ref() {
+                            Some(func) => func(key, true),
+                            _ => {}
+                        }
+                    }
+                    _ => {}
+                },
+            },
+            _ => {}
+        }
+    }
+
+    CallNextHookEx(null_mut(), code, wparam, lparam)
+}
+
 /// Get the current set of keys being pressed
 pub fn keys() -> Vec<Key> {
     KEYS.get().unwrap().lock().unwrap().clone()
@@ -381,6 +423,31 @@ pub fn run() -> Result<(), &'static str> {
             CFRelease(manager as CFTypeRef);
 
             Ok(())
+        });
+    }
+
+    #[cfg(windows)]
+    {
+        std::thread::spawn(|| {
+            unsafe {
+                // Install the low-level keyboard hook
+                let hook: HHOOK =
+                    SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_proc), null_mut(), 0);
+
+                if hook.is_null() {
+                    panic!();
+                    //return Err("Failed to set hook");
+                }
+
+                let mut msg = std::mem::zeroed();
+
+                // Message loop
+                loop {
+                    GetMessageW(&mut msg, null_mut(), 0, 0);
+                }
+
+                // UnhookWindowsHookEx(hook);
+            }
         });
     }
 

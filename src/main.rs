@@ -11,6 +11,7 @@ mod sprites;
 fn main() {
     let handle = core::terminal::init().unwrap();
     let (width, height) = core::terminal::size().unwrap();
+    // keyboard::run().unwrap();
 
     // let adjusted_width: usize = height / 2;
     // let adjusted_height: usize = height / 2;
@@ -34,6 +35,11 @@ fn main() {
     );
     vec.push(Box::new(checkerboard));
     vec.push(Box::new(firework));
+
+    println!("Test");
+    keyboard::set_callback(Some(Box::new(|key, down| {
+        println!("key: {key:?}, down: {down}");
+    })));
 
     loop {
         // // Read one byte from stdin (should be non-blocking and immediate in raw mode)
@@ -59,7 +65,8 @@ fn main() {
         // }
 
         // core::terminal::display_raw(&page).unwrap();
-        core::terminal::display(&mut vec).unwrap();
+
+        //core::terminal::display(&mut vec).unwrap();
         // sleep(Duration::from_millis(100));
 
         // Print the raw key that was pressed (no echo in raw mode)
